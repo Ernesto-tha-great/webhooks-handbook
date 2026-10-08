@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-labelledby="t d">
+<title id="t">Reliable webhook delivery, end to end</title>
+<desc id="d">On the sending side, a business write commits the order, an event and a delivery job in one transaction. A dispatcher signs and sends due deliveries through an SSRF-safe agent and retries with backoff. On the receiving side, the request is verified on its raw body, stored in an inbox keyed by webhook-id, and acknowledged; a worker applies events with a version check. A reconciliation job reads the sender's events feed to catch anything missed.</desc>
+<style>
+  svg { --surface:#fcfcfb; --panel:#f3f2ee; --box:#ffffff; --line:#c9c8c2; --ink:#0b0b0b; --ink-2:#52514e; --accent:#2a78d6; --good:#0a7d0a; --warn:#b26a00; }
+  @media (prefers-color-scheme: dark) { svg { --surface:#1a1a19; --panel:#232321; --box:#2c2c2a; --line:#4a4a46; --ink:#ffffff; --ink-2:#c3c2b7; --accent:#5598e7; --good:#3fbf3f; --warn:#e0a040; } }
+  text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--ink); }
+  .h1 { font-size: 22px; font-weight: 700; }
+  .pl { font-size: 13px; font-weight: 600; fill: var(--ink-2); letter-spacing: .06em; text-transform: uppercase; }
+  .box { fill: var(--box); stroke: var(--line); stroke-width: 1.5; }
+  .bt { font-size: 15px; font-weight: 650; }
+  .bb { font-size: 12.5px; fill: var(--ink-2); }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .arrow { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#a); }
+  .dash { stroke: var(--warn); stroke-width: 2; fill: none; stroke-dasharray: 6 5; marker-end: url(#w); }
+  .al { font-size: 12.5px; font-weight: 600; fill: var(--accent); }
+</style>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+  <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--warn)"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="var(--surface)"/>
+<text class="h1" x="40" y="48">A webhook you can count on</text>
+
+<rect x="30" y="76" width="560" height="494" rx="12" fill="var(--panel)"/>
+<text class="pl" x="52" y="104">Your API (sender)</text>
+<rect x="610" y="76" width="560" height="494" rx="12" fill="var(--panel)"/>
+<text class="pl" x="632" y="104">Your customer (receiver)</text>
+
+<!-- Sender -->
+<rect class="box" x="60" y="124" width="500" height="150" rx="10"/>
+<text class="bt" x="78" y="152">One transaction</text>
+<text class="code" x="78" y="180">INSERT INTO orders …</text>
+<text class="code" x="78" y="202">INSERT INTO events …      <tspan class="bb">← the outbox</tspan></text>
+<text class="code" x="78" y="224">INSERT INTO deliveries …  <tspan class="bb">← one job per endpoint</tspan></text>
+<text class="bb" x="78" y="256">If the commit fails, there's no event. If it succeeds, there's no lost event.</text>
+
+<rect class="box" x="60" y="304" width="500" height="160" rx="10"/>
+<text class="bt" x="78" y="332">Dispatcher (runs every second)</text>
+<text class="bb" x="78" y="358">· signs with every active secret (rotation)</text>
+<text class="bb" x="78" y="380">· sends through an agent that refuses private IPs</text>
+<text class="bb" x="78" y="402">· never follows redirects; 410 disables the endpoint</text>
+<text class="bb" x="78" y="424">· retries: now, 5 s, 5 min, 30 min, 2 h, 5 h, 10 h, 10 h</text>
+<text class="bb" x="78" y="446">· then marks the delivery dead</text>
+
+<rect class="box" x="60" y="494" width="500" height="56" rx="10"/>
+<text class="code" x="78" y="527">GET /events?after=&lt;seq&gt;</text>
+<text class="bb" x="290" y="527">the outbox, as a feed</text>
+
+<path class="arrow" d="M310 274 V300"/>
+
+<!-- Receiver -->
+<rect class="box" x="640" y="304" width="500" height="160" rx="10"/>
+<text class="bt" x="658" y="332">POST /webhooks</text>
+<text class="bb" x="658" y="358">1. verify the signature on the raw body</text>
+<text class="bb" x="658" y="380">2. reject timestamps older than 5 minutes</text>
+<text class="bb" x="658" y="402">3. INSERT OR IGNORE INTO inbox (webhook_id, …)</text>
+<text class="bb" x="658" y="424">4. reply 204 straight away</text>
+<text class="bb" x="658" y="446">duplicates hit the primary key and stop here</text>
+
+<rect class="box" x="640" y="124" width="500" height="150" rx="10"/>
+<text class="bt" x="658" y="152">Worker</text>
+<text class="bb" x="658" y="180">applies inbox rows that haven't been processed</text>
+<text class="code" x="658" y="208">… ON CONFLICT (id) DO UPDATE …</text>
+<text class="code" x="658" y="230">WHERE excluded.version &gt; orders.version</text>
+<text class="bb" x="658" y="258">so an old event arriving late can't undo a new one</text>
+<path class="arrow" d="M890 304 V278"/>
+
+<rect class="box" x="640" y="494" width="500" height="56" rx="10"/>
+<text class="bt" x="658" y="527">Reconcile</text>
+<text class="bb" x="760" y="527">page through the feed, store what's missing</text>
+
+<path class="arrow" d="M560 384 H636"/>
+<text class="al" x="566" y="374">signed POST</text>
+<path class="dash" d="M640 522 H564"/>
+<text class="al" x="572" y="512" style="fill:var(--warn)">catch up</text>
+</svg>

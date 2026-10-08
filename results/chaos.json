@@ -1,0 +1,25 @@
+{
+  "seed": 7,
+  "orders": 150,
+  "results": [
+    {
+      "approach": "Naive: send inline, retry 3×, apply on arrival",
+      "events": 600,
+      "appliedAtLeastOnce": 422,
+      "appliedMoreThanOnce": 44,
+      "lost": 178,
+      "wrongFinalState": 30,
+      "recoveredByReconciliation": 0
+    },
+    {
+      "approach": "Handbook: outbox, backoff, inbox, versions, reconcile",
+      "events": 600,
+      "appliedAtLeastOnce": 600,
+      "appliedMoreThanOnce": 0,
+      "lost": 0,
+      "wrongFinalState": 0,
+      "recoveredByReconciliation": 3,
+      "duplicatesAbsorbed": 73
+    }
+  ]
+}

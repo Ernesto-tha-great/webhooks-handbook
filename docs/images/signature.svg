@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-labelledby="t d">
+<title id="t">Anatomy of a Standard Webhooks signature</title>
+<desc id="d">The webhook-id, webhook-timestamp and raw body are joined with dots and signed with HMAC-SHA256 using the endpoint secret. The base64 result is sent in the webhook-signature header, prefixed with v1. During rotation, two signatures are sent, separated by a space.</desc>
+<style>
+  svg { --surface:#fcfcfb; --box:#ffffff; --line:#c9c8c2; --ink:#0b0b0b; --ink-2:#52514e; --a:#2a78d6; --b:#eb6834; --c:#1baf7a; --s:#7a5af8; }
+  @media (prefers-color-scheme: dark) { svg { --surface:#1a1a19; --box:#2c2c2a; --line:#4a4a46; --ink:#ffffff; --ink-2:#c3c2b7; --a:#5598e7; --b:#e8774a; --c:#2bc48c; --s:#9b85ff; } }
+  text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--ink); }
+  .h1 { font-size: 22px; font-weight: 700; }
+  .lbl { font-size: 13px; font-weight: 600; fill: var(--ink-2); }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; white-space: pre; }
+  .box { fill: var(--box); stroke: var(--line); stroke-width: 1.5; }
+  .arrow { stroke: var(--ink-2); stroke-width: 1.5; fill: none; marker-end: url(#a); }
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-2)"/></marker></defs>
+<rect width="100%" height="100%" fill="var(--surface)"/>
+<text class="h1" x="40" y="48">What actually gets signed</text>
+
+<text class="lbl" x="40" y="94">Headers</text>
+<rect class="box" x="40" y="104" width="560" height="96" rx="10"/>
+<text class="code" x="58" y="134">webhook-id:        <tspan style="fill:var(--a)">msg_2KWPBgLlAfxdpx2AI54pPJ85f4W</tspan></text>
+<text class="code" x="58" y="158">webhook-timestamp: <tspan style="fill:var(--b)">1759914000</tspan></text>
+<text class="code" x="58" y="182">webhook-signature: <tspan style="fill:var(--s)">v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ…</tspan></text>
+
+<text class="lbl" x="640" y="94">Raw body (exact bytes)</text>
+<rect class="box" x="640" y="104" width="520" height="96" rx="10"/>
+<text class="code" x="658" y="134" style="fill:var(--c)">{"type":"order.updated",</text>
+<text class="code" x="658" y="158" style="fill:var(--c)"> "timestamp":"2026-10-08T09:00:00Z",</text>
+<text class="code" x="658" y="182" style="fill:var(--c)"> "data":{"id":"ord_1","status":"paid"…}}</text>
+
+<text class="lbl" x="40" y="252">Signed content: the three joined with dots</text>
+<rect class="box" x="40" y="262" width="1120" height="44" rx="10"/>
+<text class="code" x="58" y="290"><tspan style="fill:var(--a)">msg_2KWPBgLlAfxdpx2AI54pPJ85f4W</tspan>.<tspan style="fill:var(--b)">1759914000</tspan>.<tspan style="fill:var(--c)">{"type":"order.updated","timestamp":…}</tspan></text>
+
+<path class="arrow" d="M330 200 V258"/>
+<path class="arrow" d="M900 200 V258"/>
+
+<text class="code" x="40" y="352">base64( HMAC-SHA256( secret, signed content ) )  →  <tspan style="fill:var(--s)">v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ…</tspan></text>
+<text class="lbl" x="40" y="392">Rotating secrets? Send both: "v1,&lt;new&gt; v1,&lt;old&gt;". The receiver accepts the request if any one matches.</text>
+</svg>
