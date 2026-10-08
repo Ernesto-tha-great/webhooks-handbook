@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, describe, it } from 'node:test';
-import { createReceiver, reconcile, ReceiverDb } from '../src/receiver/receiver.js';
-import { createSenderApi } from '../src/sender/api.js';
-import { SenderDb } from '../src/sender/db.js';
-import { Dispatcher } from '../src/sender/dispatcher.js';
-import { createSafeAgent } from '../src/ssrf.js';
+import { createReceiver, reconcile, ReceiverDb } from '../src/receiver/receiver';
+import { createSenderApi } from '../src/sender/api';
+import { SenderDb } from '../src/sender/db';
+import { Dispatcher } from '../src/sender/dispatcher';
+import { createSafeAgent } from '../src/ssrf';
 
 const agent = createSafeAgent({ allowPrivate: true });
 const servers: Server[] = [];
@@ -115,12 +115,27 @@ describe('the receiver', () => {
     const time = clock();
     const dispatcher = new Dispatcher(senderDb, { agent, now: time.now });
     await dispatcher.tick();
-    senderDb.sqlite.prepare("UPDATE deliveries SET status = 'pending'").run();
+    senderDb.sqlite.prepare("UPDATE deliveries SET status = 'pending', next_attempt_at = 0").run();
     await dispatcher.tick();
 
     assert.equal(stats.received, 2);
     assert.equal(stats.duplicates, 1);
     assert.equal(receiverDb.processInbox(), 1);
+  });
+
+  it('sends a delivery once even when two ticks overlap', async () => {
+    const receiverDb = new ReceiverDb();
+    const senderDb = new SenderDb();
+    const { secret } = senderDb.addEndpoint('placeholder');
+    const { server, stats } = createReceiver({ db: receiverDb, secrets: [secret] });
+    const url = await listen(server);
+    senderDb.sqlite.prepare('UPDATE endpoints SET url = ?').run(`${url}/webhooks`);
+    senderDb.createOrder('sam', 100);
+
+    const dispatcher = new Dispatcher(senderDb, { agent });
+    await Promise.all([dispatcher.tick(), dispatcher.tick()]);
+
+    assert.equal(stats.received, 1);
   });
 
   it('keeps the newest version when events arrive out of order', () => {

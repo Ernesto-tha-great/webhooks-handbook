@@ -14,7 +14,7 @@ for (const [network, prefix] of [
 ] as const) {
   blocked.addSubnet(network, prefix, 'ipv4');
 }
-for (const [network, prefix] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10]] as const) {
+for (const [network, prefix] of [['::', 96], ['fc00::', 7], ['fe80::', 10]] as const) {
   blocked.addSubnet(network, prefix, 'ipv6');
 }
 
@@ -68,7 +68,7 @@ export function createSafeAgent(options: { allowPrivate?: boolean; connectTimeou
           if (unsafe && !options.allowPrivate) {
             return callback(new UnsafeUrlError(`${hostname} resolves to private address ${unsafe.address}`), [] as LookupAddress[]);
           }
-          // undici asks for all addresses; hand back what it asked for.
+          // Node asks for every address when it tries IPv4 and IPv6 side by side; hand back what it asked for.
           if ((lookupOptions as { all?: boolean }).all) return callback(null, list);
           const first = list[0]!;
           return (callback as unknown as (e: null, address: string, family: number) => void)(null, first.address, first.family);

@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
 import { fetch } from 'undici';
-import { assertAcceptableUrl, createSafeAgent, isPrivateAddress, UnsafeUrlError } from '../src/ssrf.js';
+import { assertAcceptableUrl, createSafeAgent, isPrivateAddress, UnsafeUrlError } from '../src/ssrf';
 
 describe('SSRF guards', () => {
   it('knows which addresses are private', () => {

@@ -5,10 +5,10 @@
     {
       "approach": "Naive: send inline, retry 3×, apply on arrival",
       "events": 600,
-      "appliedAtLeastOnce": 422,
-      "appliedMoreThanOnce": 44,
-      "lost": 178,
-      "wrongFinalState": 30,
+      "appliedAtLeastOnce": 426,
+      "appliedMoreThanOnce": 46,
+      "lost": 174,
+      "wrongFinalState": 29,
       "recoveredByReconciliation": 0
     },
     {
@@ -18,8 +18,9 @@
       "appliedMoreThanOnce": 0,
       "lost": 0,
       "wrongFinalState": 0,
-      "recoveredByReconciliation": 3,
-      "duplicatesAbsorbed": 73
+      "recoveredByReconciliation": 4,
+      "duplicatesAbsorbed": 73,
+      "wrongBeforeReconcile": 0
     }
   ]
 }

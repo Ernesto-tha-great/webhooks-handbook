@@ -4,11 +4,12 @@
  *   naive:    POST the webhook from the request handler, retry 3 times on
  *             failure, receiver applies whatever arrives, in arrival order.
  *   handbook: outbox + dispatcher with backoff, inbox with dedupe, version
- *             checks, a dispatcher "crash" halfway, reconciliation at the end.
+ *             checks, reconciliation at the end.
  *
  * The receiver fails 15% of requests outright, does the work and then drops
- * the connection on 8%, stalls past the sender's timeout on 4%, and is fully
- * down for 1.5 seconds in the middle. Everything is seeded and reproducible.
+ * the connection on 8%, stalls past the sender's timeout on 4%, and fails
+ * every request for 1.5 seconds in the middle. The misbehaviour is seeded;
+ * the outage is timed by the clock, so the numbers move a little between runs.
  *
  *   npm run chaos
  */
@@ -16,12 +17,12 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fetch } from 'undici';
-import { createReceiver, reconcile, ReceiverDb } from '../src/receiver/receiver.js';
-import { createSenderApi } from '../src/sender/api.js';
-import { SenderDb } from '../src/sender/db.js';
-import { Dispatcher } from '../src/sender/dispatcher.js';
-import { generateSecret, signHeaders, verify } from '../src/signing.js';
-import { createSafeAgent } from '../src/ssrf.js';
+import { createReceiver, reconcile, ReceiverDb } from '../src/receiver/receiver';
+import { createSenderApi } from '../src/sender/api';
+import { SenderDb } from '../src/sender/db';
+import { Dispatcher } from '../src/sender/dispatcher';
+import { generateSecret, signHeaders, verify } from '../src/signing';
+import { createSafeAgent } from '../src/ssrf';
 
 const ORDERS = 150;
 const STATUSES = ['paid', 'shipped', 'delivered'];
@@ -165,18 +166,20 @@ async function handbook(seed: number): Promise<Outcome> {
   const senderUrl = await listen(senderApi);
 
   const receiverDb = new ReceiverDb();
+  // Log every time an event is applied, so "applied more than once" is counted, not assumed.
+  receiverDb.sqlite.exec(`
+    CREATE TABLE applied (webhook_id TEXT NOT NULL);
+    CREATE TRIGGER log_apply AFTER UPDATE OF processed_at ON inbox BEGIN INSERT INTO applied VALUES (NEW.webhook_id); END;`);
   const { secret } = senderDb.addEndpoint('placeholder');
   const { server, stats } = createReceiver({ db: receiverDb, secrets: [secret], chaos: misbehaviour(seed, () => started) });
   const receiverUrl = await listen(server);
   senderDb.sqlite.prepare('UPDATE endpoints SET url = ?').run(`${receiverUrl}/webhooks`);
 
   const agent = createSafeAgent({ allowPrivate: true });
-  // The real schedule, compressed from 36 hours into about a second.
-  const options = { agent, timeoutMs: 1_000, scheduleMs: [0, 100, 200, 300, 400] };
-  let dispatcher = new Dispatcher(senderDb, options);
+  // The real schedule, compressed from about 28 hours into about a second.
+  const dispatcher = new Dispatcher(senderDb, { agent, timeoutMs: 1_000, scheduleMs: [0, 100, 200, 300, 400] });
 
   let running = true;
-  let crashed = false;
   const loop = (async () => {
     while (running || senderDb.pendingDeliveries() > 0) {
       await dispatcher.tick();
@@ -188,26 +191,24 @@ async function handbook(seed: number): Promise<Outcome> {
   started = Date.now();
   const ids: string[] = [];
   let events = 0;
-  for (const [i, step] of plan(seed).entries()) {
+  for (const step of plan(seed)) {
     if (step.status === null) ids[step.order] = senderDb.createOrder(`customer-${step.order}`, 1_000 + step.order).id;
     else senderDb.updateOrderStatus(ids[step.order]!, step.status);
     events++;
-    if (!crashed && i === 300) {
-      // The dispatcher process dies and restarts. Its state was all in the database.
-      dispatcher = new Dispatcher(senderDb, options);
-      crashed = true;
-    }
     await sleep(8);
   }
   running = false;
   await loop;
 
+  // How many orders would be wrong if we stopped here, without the events feed?
+  const truth = new Map(senderDb.orders().map((o) => [o.id, o.status]));
+  const wrongBeforeReconcile = receiverDb.orders().filter((o) => truth.get(o.id) !== o.status).length + (truth.size - receiverDb.orders().length);
+
   // Anything that ran out of retries during the outage comes back via the events feed.
   const recovered = await reconcile(receiverDb, senderUrl);
   receiverDb.processInbox();
 
-  const processed = receiverDb.sqlite.prepare('SELECT COUNT(*) AS n FROM inbox WHERE processed_at IS NOT NULL').get() as { n: number };
-  const truth = new Map(senderDb.orders().map((o) => [o.id, o.status]));
+  const applied = receiverDb.sqlite.prepare('SELECT COUNT(DISTINCT webhook_id) AS once, (SELECT COUNT(*) FROM (SELECT 1 FROM applied GROUP BY webhook_id HAVING COUNT(*) > 1)) AS more FROM applied').get() as { once: number; more: number };
   const theirs = new Map(receiverDb.orders().map((o) => [o.id, o.status]));
 
   server.closeAllConnections();
@@ -218,12 +219,12 @@ async function handbook(seed: number): Promise<Outcome> {
   return {
     approach: 'Handbook: outbox, backoff, inbox, versions, reconcile',
     events,
-    appliedAtLeastOnce: processed.n,
-    appliedMoreThanOnce: 0, // the inbox's primary key makes this impossible; stats.duplicates shows how many it absorbed
-    lost: events - processed.n,
+    appliedAtLeastOnce: applied.once,
+    appliedMoreThanOnce: applied.more,
+    lost: events - applied.once,
     wrongFinalState: [...truth].filter(([id, status]) => theirs.get(id) !== status).length,
     recoveredByReconciliation: recovered,
-    ...{ duplicatesAbsorbed: stats.duplicates },
+    ...{ duplicatesAbsorbed: stats.duplicates, wrongBeforeReconcile },
   } as Outcome;
 }
 
@@ -240,9 +241,10 @@ const table = [
   ...results.map((r) => `| ${r.approach} | ${r.events} | ${pct(r.lost, r.events)} | ${pct(r.appliedMoreThanOnce, r.events)} | ${pct(r.wrongFinalState, ORDERS)} | ${r.recoveredByReconciliation} |`),
 ].join('\n');
 console.log(table);
-const absorbed = (results[1] as Outcome & { duplicatesAbsorbed?: number }).duplicatesAbsorbed;
+const { duplicatesAbsorbed: absorbed, wrongBeforeReconcile } = results[1] as Outcome & { duplicatesAbsorbed: number; wrongBeforeReconcile: number };
 console.log(`\nThe handbook receiver absorbed ${absorbed} duplicate deliveries without applying them twice.`);
+console.log(`Before it caught up from the events feed, ${wrongBeforeReconcile} of its orders were in the wrong state.`);
 
 mkdirSync('results', { recursive: true });
-writeFileSync('results/chaos.md', table + `\n\nDuplicate deliveries absorbed by the inbox: ${absorbed}.\n`);
+writeFileSync('results/chaos.md', table + `\n\nDuplicate deliveries absorbed by the inbox: ${absorbed}. Orders in the wrong state before reconciliation: ${wrongBeforeReconcile}.\n`);
 writeFileSync('results/chaos.json', JSON.stringify({ seed, orders: ORDERS, results }, null, 2) + '\n');

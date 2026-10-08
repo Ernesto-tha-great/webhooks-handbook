@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-labelledby="t d">
 <title id="t">Naive webhooks versus the handbook, against the same flaky receiver</title>
-<desc id="d">Events lost: naive 29.7%, handbook 0.0%; Events applied more than once: naive 7.3%, handbook 0.0%; Orders left in the wrong state: naive 20.0%, handbook 0.0%.</desc>
+<desc id="d">Events lost: naive 29.0%, handbook 0.0%; Events applied more than once: naive 7.7%, handbook 0.0%; Orders left in the wrong state: naive 19.3%, handbook 0.0%.</desc>
 <style>
   svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --ink-3:#8a8983; --naive:#eb6834; --hb:#2a78d6; }
   @media (prefers-color-scheme: dark) { svg { --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --ink-3:#8f8e86; --naive:#d95926; --hb:#3987e5; } }
@@ -16,17 +16,17 @@
 <rect x="400" y="86" width="14" height="14" rx="3" fill="var(--hb)"/><text class="k" x="420" y="98">Handbook: outbox, backoff, inbox, versions, reconcile</text>
 <text class="lbl" x="40" y="154">Events lost</text>
 <rect x="300" y="164" width="520.0" height="18" rx="4" fill="var(--naive)"/>
-<text class="val" x="830.0" y="178">29.7%</text>
+<text class="val" x="830.0" y="178">29.0%</text>
 <rect x="300" y="196" width="2" height="2" fill="var(--hb)"/>
 <text class="val" x="310.0" y="202">0.0%</text>
 <text class="lbl" x="40" y="240">Events applied more than once</text>
-<rect x="300" y="250" width="128.5" height="18" rx="4" fill="var(--naive)"/>
-<text class="val" x="438.5" y="264">7.3%</text>
+<rect x="300" y="250" width="137.5" height="18" rx="4" fill="var(--naive)"/>
+<text class="val" x="447.5" y="264">7.7%</text>
 <rect x="300" y="282" width="2" height="2" fill="var(--hb)"/>
 <text class="val" x="310.0" y="288">0.0%</text>
 <text class="lbl" x="40" y="326">Orders left in the wrong state</text>
-<rect x="300" y="336" width="350.6" height="18" rx="4" fill="var(--naive)"/>
-<text class="val" x="660.6" y="350">20.0%</text>
+<rect x="300" y="336" width="346.7" height="18" rx="4" fill="var(--naive)"/>
+<text class="val" x="656.7" y="350">19.3%</text>
 <rect x="300" y="368" width="2" height="2" fill="var(--hb)"/>
 <text class="val" x="310.0" y="374">0.0%</text>
 <text class="note" x="40" y="400">Seed 7. Source: npm run chaos. Every number is reproducible on your machine.</text>

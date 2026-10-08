@@ -1,10 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { assertAcceptableUrl, UnsafeUrlError } from '../ssrf.js';
-import type { SenderDb } from './db.js';
+import { assertAcceptableUrl, UnsafeUrlError } from '../ssrf';
+import type { SenderDb } from './db';
 
 /**
- * The sending side's HTTP API: a tiny orders service, endpoint management,
- * and the events feed that lets receivers reconcile.
+ * The sending side's HTTP API: a tiny orders service and endpoint management.
  */
 export function createSenderApi(db: SenderDb, options: { allowHttpEndpoints?: boolean } = {}) {
   return createServer(async (req, res) => {

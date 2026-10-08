@@ -1,12 +1,12 @@
 import type { Dispatcher as UndiciDispatcher } from 'undici';
 import { fetch } from 'undici';
-import { signHeaders } from '../signing.js';
-import type { SenderDb, StoredSecret } from './db.js';
+import { signHeaders } from '../signing';
+import type { SenderDb, StoredSecret } from './db';
 
 /**
  * Svix's published retry schedule, which the Standard Webhooks spec points
  * to: immediately, then 5 s, 5 min, 30 min, 2 h, 5 h, 10 h and 10 h.
- * About a day and a half in total before we give up.
+ * A little over a day in total before we give up.
  */
 export const DEFAULT_SCHEDULE_MS = [0, 5_000, 300_000, 1_800_000, 7_200_000, 18_000_000, 36_000_000, 36_000_000];
 
@@ -41,14 +41,22 @@ export class Dispatcher {
 
   /** Sends everything that's due, once. Call it on an interval. */
   async tick(): Promise<TickReport> {
-    const due = this.db.sqlite.prepare(`
-      SELECT d.event_seq, d.endpoint_id, d.attempts, e.id AS event_id, e.payload, ep.url, ep.secrets
-      FROM deliveries d
-      JOIN events e ON e.seq = d.event_seq
-      JOIN endpoints ep ON ep.id = d.endpoint_id
-      WHERE d.status = 'pending' AND d.next_attempt_at <= ? AND ep.status = 'active'
-      ORDER BY d.event_seq
-      LIMIT ?`).all(this.now(), this.options.batchSize ?? 50) as unknown as DueRow[];
+    const due = this.db.transaction(() => {
+      const rows = this.db.sqlite.prepare(`
+        SELECT d.event_seq, d.endpoint_id, d.attempts, e.id AS event_id, e.payload, ep.url, ep.secrets
+        FROM deliveries d
+        JOIN events e ON e.seq = d.event_seq
+        JOIN endpoints ep ON ep.id = d.endpoint_id
+        WHERE d.status = 'pending' AND d.next_attempt_at <= ? AND ep.status = 'active'
+        ORDER BY d.event_seq
+        LIMIT ?`).all(this.now(), this.options.batchSize ?? 50) as unknown as DueRow[];
+      // Claim them: push each one's next attempt past the request timeout, so another
+      // tick (or another dispatcher) doesn't send it again while we wait for an answer.
+      const claimedUntil = this.now() + (this.options.timeoutMs ?? 10_000) + 5_000;
+      const claim = this.db.sqlite.prepare('UPDATE deliveries SET next_attempt_at = ? WHERE event_seq = ? AND endpoint_id = ?');
+      for (const row of rows) claim.run(claimedUntil, row.event_seq, row.endpoint_id);
+      return rows;
+    });
 
     const report: TickReport = { attempted: due.length, delivered: 0, retrying: 0, dead: 0 };
     await Promise.all(due.map(async (row) => {
@@ -71,7 +79,7 @@ export class Dispatcher {
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json', 'user-agent': 'webhooks-handbook/1.0' },
         body: row.payload,
-        // Never follow redirects: a 302 to an internal address is the oldest SSRF trick there is.
+        // Never follow redirects: a 302 to an internal address would get around our SSRF checks.
         redirect: 'manual',
         dispatcher: this.options.agent,
         signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),

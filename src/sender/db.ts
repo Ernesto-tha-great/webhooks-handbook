@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { generateSecret } from '../signing.js';
+import { generateSecret } from '../signing';
 
 export interface OrderRow { id: string; customer: string; total_cents: number; status: string; version: number; updated_at: string }
 export interface EventRow { seq: number; id: string; type: string; payload: string; created_at: string }
@@ -87,7 +87,7 @@ export class SenderDb {
   createOrder(customer: string, totalCents: number, now = new Date()): OrderRow {
     return this.transaction(() => {
       const order: OrderRow = {
-        id: `ord_${randomUUID().slice(0, 12)}`, customer, total_cents: totalCents,
+        id: `ord_${randomUUID().replace(/-/g, '').slice(0, 12)}`, customer, total_cents: totalCents,
         status: 'created', version: 1, updated_at: now.toISOString(),
       };
       this.sqlite.prepare('INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?)')

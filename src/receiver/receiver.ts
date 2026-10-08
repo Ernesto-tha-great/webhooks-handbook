@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
-import { verify, WebhookVerificationError } from '../signing.js';
+import { verify, WebhookVerificationError } from '../signing';
 
 interface OrderData { id: string; status: string; version: number; updated_at: string }
 interface WebhookEvent { type: string; timestamp: string; data: OrderData }

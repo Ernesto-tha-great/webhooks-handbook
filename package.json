@@ -9,12 +9,15 @@
     "node": ">=22.13"
   },
   "scripts": {
+    "sign": "node --no-warnings --import tsx scripts/sign.ts",
+    "outbox": "node --no-warnings --import tsx scripts/outbox.ts",
+    "check-urls": "node --no-warnings --import tsx scripts/check-urls.ts",
     "sender": "node --no-warnings --import tsx src/sender/main.ts",
     "receiver": "node --no-warnings --import tsx src/receiver/main.ts",
     "chaos": "node --no-warnings --import tsx scripts/chaos.ts",
+    "chart": "node --no-warnings --import tsx scripts/chart.ts",
     "test": "node --no-warnings --import tsx --test test/*.test.ts",
-    "typecheck": "tsc --noEmit",
-    "chart": "node --no-warnings --import tsx scripts/chart.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "undici": "^7.30.0"

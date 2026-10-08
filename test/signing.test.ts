@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Webhook } from 'standardwebhooks';
-import { generateSecret, signHeaders, verify, WebhookVerificationError } from '../src/signing.js';
+import { generateSecret, signHeaders, verify, WebhookVerificationError } from '../src/signing';
 
 const body = JSON.stringify({ type: 'order.updated', timestamp: '2026-10-08T09:00:00.000Z', data: { id: 'ord_1', status: 'paid' } });
 
